@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 from typing import Dict, Tuple
 
@@ -93,6 +94,24 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
     best_wl = float(total_hpwl(pos, st.net_ptr, st.net_macros))
     cur_wl = best_wl
 
+    debug = os.getenv("FAST_MCMC_DEBUG", "0").strip().lower() not in ("0", "false", "no", "")
+    log_every = int(os.getenv("FAST_MCMC_LOG_EVERY", "20000"))
+    log_every_s = float(os.getenv("FAST_MCMC_LOG_EVERY_S", "2.0"))
+    # Note: keep counters as Python ints (fast, avoids NumPy scalar overhead)
+    prop_total = 0
+    eval_total = 0
+    acc_total = 0
+    acc_uphill = 0
+    best_improve = 0
+    last_log_t = start
+    last_log_it = 0
+    last_log_prop = 0
+    last_log_eval = 0
+    last_log_acc = 0
+    last_log_up = 0
+    last_log_best = best_wl
+    last_log_cur = cur_wl
+
     it = 0
     while True:
         now = time.time()
@@ -100,8 +119,54 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
             break
 
         it += 1
+        prop_total += 1
         frac = min(1.0, (now - start) / max(1e-9, cfg.time_limit_s))
         T = T0 * ((Tend / T0) ** frac)
+
+        if debug:
+            do_log = False
+            if log_every > 0 and it % log_every == 0:
+                do_log = True
+            if (now - last_log_t) >= log_every_s:
+                do_log = True
+            if do_log:
+                dt = max(1e-9, now - last_log_t)
+                dprop = prop_total - last_log_prop
+                deval = eval_total - last_log_eval
+                dacc = acc_total - last_log_acc
+                dup = acc_uphill - last_log_up
+                acc_rate = (dacc / deval) if deval > 0 else 0.0
+                up_rate = (dup / dacc) if dacc > 0 else 0.0
+                prop_s = dprop / dt
+                eval_s = deval / dt
+                best_drop = last_log_best - best_wl
+                cur_drop = last_log_cur - cur_wl
+
+                print(
+                    "[FAST_MCMC]"
+                    f"[seed={cfg.seed}]"
+                    f" t={now - start:.2f}s"
+                    f" it={it}"
+                    f" frac={frac:.3f}"
+                    f" T={T:.4g}"
+                    f" best_wl={best_wl:.6g}"
+                    f" cur_wl={cur_wl:.6g}"
+                    f" acc={acc_rate:.3f}"
+                    f" up={up_rate:.3f}"
+                    f" prop/s={prop_s:.0f}"
+                    f" eval/s={eval_s:.0f}"
+                    f" Δbest={best_drop:.3g}"
+                    f" Δcur={cur_drop:.3g}"
+                )
+
+                last_log_t = now
+                last_log_it = it
+                last_log_prop = prop_total
+                last_log_eval = eval_total
+                last_log_acc = acc_total
+                last_log_up = acc_uphill
+                last_log_best = best_wl
+                last_log_cur = cur_wl
 
         if it % 4000 == 0:
             weights = refresh_weights()
@@ -145,6 +210,7 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
                 continue
 
             # wl delta: two moves
+            eval_total += 1
             d1 = float(
                 delta_hpwl_for_macro_move(pos, st.net_ptr, st.net_macros, st.macro_net_ptr, st.macro_nets, m, nx, ny)
             )
@@ -155,6 +221,9 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
             accept = d <= 0.0 or rng.random() < math.exp(-d / max(1e-12, T))
             if not accept:
                 continue
+            acc_total += 1
+            if d > 0.0:
+                acc_uphill += 1
 
             # apply swap: update grid for both
             grid_remove_macro(grid, counts, m, oldx, oldy, hw, hh, bin_w, bin_h, cfg.rows, cfg.cols)
@@ -168,18 +237,23 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
             if cur_wl < best_wl:
                 best_wl = float(cur_wl)
                 best_pos = pos.copy()
+                best_improve += 1
             continue
 
         nx, ny = _clamp(float(nx), float(ny), hw, hh, st.canvas_w, st.canvas_h)
         if grid_has_overlap_for_macro(pos, st.half_w, st.half_h, grid, counts, m, nx, ny, bin_w, bin_h, cfg.rows, cfg.cols, cfg.gap):
             continue
 
+        eval_total += 1
         d = float(
             delta_hpwl_for_macro_move(pos, st.net_ptr, st.net_macros, st.macro_net_ptr, st.macro_nets, m, nx, ny)
         )
         accept = d <= 0.0 or rng.random() < math.exp(-d / max(1e-12, T))
         if not accept:
             continue
+        acc_total += 1
+        if d > 0.0:
+            acc_uphill += 1
 
         # apply move
         grid_remove_macro(grid, counts, m, oldx, oldy, hw, hh, bin_w, bin_h, cfg.rows, cfg.cols)
@@ -190,6 +264,7 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
         if cur_wl < best_wl:
             best_wl = float(cur_wl)
             best_pos = pos.copy()
+            best_improve += 1
 
     return {"pos": best_pos, "wl": best_wl}
 
