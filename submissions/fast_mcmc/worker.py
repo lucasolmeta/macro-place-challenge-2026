@@ -90,12 +90,31 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
     T0 = canvas * 0.12
     Tend = canvas * 0.0008
     # SA acceptance uses HPWL plus a density proxy; weight decays slightly with T, never hits zero
-    density_w0 = float(canvas * 3e-4)
+    density_w0 = float(canvas * 3e-4 * 80.0)
 
     start = time.time()
     best_pos = pos.copy()
     best_wl = float(total_hpwl(pos, st.net_ptr, st.net_macros))
     cur_wl = best_wl
+
+    # Track a proxy-aligned objective for selecting the returned snapshot.
+    # Otherwise, long runs tend to keep improving HPWL while silently degrading density/congestion proxy.
+    cur_density = 0.0
+    for mm in range(st.n_hard):
+        cur_density += float(
+            macro_density_score(
+                counts,
+                float(pos[mm, 0]),
+                float(pos[mm, 1]),
+                float(st.half_w[mm]),
+                float(st.half_h[mm]),
+                bin_w,
+                bin_h,
+                cfg.rows,
+                cfg.cols,
+            )
+        )
+    best_cost = float(best_wl + density_w0 * cur_density)
 
     debug = os.getenv("FAST_MCMC_DEBUG", "0").strip().lower() not in ("0", "false", "no", "")
     log_every = int(os.getenv("FAST_MCMC_LOG_EVERY", "20000"))
@@ -252,7 +271,10 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
             grid_insert_macro(grid, counts, j, j_nx, j_ny, j_hw, j_hh, bin_w, bin_h, cfg.rows, cfg.cols)
 
             cur_wl += d_hpwl
-            if cur_wl < best_wl:
+            cur_density += delta_density
+            cur_cost = float(cur_wl + density_w0 * cur_density)
+            if cur_cost < best_cost:
+                best_cost = cur_cost
                 best_wl = float(cur_wl)
                 best_pos = pos.copy()
                 best_improve += 1
@@ -283,12 +305,15 @@ def run_worker(st: HardState, cfg: WorkerConfig) -> Dict[str, object]:
         grid_insert_macro(grid, counts, m, nx, ny, hw, hh, bin_w, bin_h, cfg.rows, cfg.cols)
 
         cur_wl += d_hpwl
-        if cur_wl < best_wl:
+        cur_density += delta_density
+        cur_cost = float(cur_wl + density_w0 * cur_density)
+        if cur_cost < best_cost:
+            best_cost = cur_cost
             best_wl = float(cur_wl)
             best_pos = pos.copy()
             best_improve += 1
 
-    return {"pos": best_pos, "wl": best_wl}
+    return {"pos": best_pos, "wl": best_wl, "cost": best_cost}
 
 
 def worker_entry(args) -> Dict[str, object]:
