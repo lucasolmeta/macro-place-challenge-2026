@@ -7,7 +7,7 @@ name = "macro-place"
 version = "0.1.0"
 description = "Macro Placement Challenge - Beat Kahng's benchmarks for $20K"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = {file = "LICENSE.md"}
 authors = [
     {name = "Partcl"},
