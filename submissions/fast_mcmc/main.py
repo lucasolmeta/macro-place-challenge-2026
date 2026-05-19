@@ -115,8 +115,45 @@ if __name__ not in sys.modules:
     del _self_stub, _self_globals, _stub_getattr
 
 # Local package modules – kept as flat (non-relative) imports because
-# ``submissions/fast_mcmc/`` is not a Python package (no ``__init__.py``)
-# and is added to ``sys.path`` by the evaluator harness on load.
+# ``submissions/fast_mcmc/`` is not a Python package (no ``__init__.py``).
+# The challenge harness's ``_load_placer`` (``macro_place/evaluate.py``)
+# loads us via ``importlib.util.spec_from_file_location`` + ``exec_module``,
+# which does NOT add the placer file's directory to ``sys.path``.  We
+# therefore self-bootstrap it here so ``import fast_eval``,
+# ``from state import …``, etc. resolve correctly.
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+if _this_dir not in sys.path:
+    sys.path.insert(0, _this_dir)
+
+# #region agent log
+try:
+    import json as _dbg_json, os as _dbg_os, time as _dbg_time
+    _dbg_main_dir = _dbg_os.path.dirname(_dbg_os.path.abspath(__file__))
+    with open('/Users/lucasolmeta/Desktop/Projects/macro-place-challenge-2026/.cursor/debug-ad94f7.log', 'a') as _dbg_f:
+        _dbg_f.write(_dbg_json.dumps({
+            "sessionId": "ad94f7",
+            "hypothesisId": "H1+H2+H3",
+            "runId": "pre-fix",
+            "location": "submissions/fast_mcmc/main.py:120 (just before `import fast_eval`)",
+            "message": "sys.path / cwd / file-location snapshot at the failing import",
+            "data": {
+                "cwd": _dbg_os.getcwd(),
+                "__file__": __file__,
+                "__name__": __name__,
+                "main_dir": _dbg_main_dir,
+                "main_dir_on_sys_path": _dbg_main_dir in sys.path,
+                "fast_eval_exists_in_main_dir": _dbg_os.path.exists(_dbg_os.path.join(_dbg_main_dir, "fast_eval.py")),
+                "state_exists_in_main_dir": _dbg_os.path.exists(_dbg_os.path.join(_dbg_main_dir, "state.py")),
+                "sys_path": list(sys.path),
+                "PYTHONPATH_env": _dbg_os.environ.get("PYTHONPATH", "<unset>"),
+            },
+            "timestamp": int(_dbg_time.time() * 1000),
+        }) + "\n")
+    del _dbg_json, _dbg_os, _dbg_time, _dbg_main_dir, _dbg_f
+except Exception:
+    pass
+# #endregion
+
 import fast_eval as fe
 from initialization import GraspReport
 from state import (
@@ -131,7 +168,7 @@ from worker import WorkerConfig, WorkerResult, run_worker
 # ║ 0. Defaults & environment helpers                                      ║
 # ╚════════════════════════════════════════════════════════════════════════╝
 
-DEFAULT_TIMEOUT_SECONDS: float = 60.0
+DEFAULT_TIMEOUT_SECONDS: float = 3000.0
 DEFAULT_NUM_WORKERS: int = 0   # 0 ⇒ os.cpu_count() (capped at 16)
 DEFAULT_SEED: int = 0
 MAX_POOL_SIZE: int = 16        # cursor.md §C: "spawns 16 independent worker processes"
