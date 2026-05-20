@@ -1,5 +1,5 @@
 """
-fast_mcmc.initialization
+modified_annealing.initialization
 ========================
 
 Per-worker GRASP (Greedy Randomized Adaptive Search Procedure)
@@ -512,7 +512,7 @@ def grasp_initialize(
     multiprocessing pool feeds on.
 
     Args:
-        state: input :class:`fast_mcmc.state.PlacementState`.
+        state: input :class:`modified_annealing.state.PlacementState`.
         seed:  integer seed for this worker's RNG.
         num_candidates: collision-free target per macro
             (see :data:`DEFAULT_NUM_CANDIDATES`).
@@ -763,7 +763,7 @@ def grasp_initialize_batch(
 if __name__ == "__main__":
     # Self-contained smoke test on a synthetic 8-macro scene that does
     # not require torch or any external benchmark file.  Run with:
-    #   python submissions/fast_mcmc/initialization.py
+    #   python submissions/modified_annealing/initialization.py
     import types
     from state import build_state, verify_state
 

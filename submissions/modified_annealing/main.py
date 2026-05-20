@@ -1,14 +1,14 @@
 """
-fast_mcmc.main
-==============
+modified_annealing.main
+=======================
 
-Orchestrator + CLI for the high-performance MCMC macro placer.
+Orchestrator + CLI for the high-performance modified annealing macro placer.
 
 This module is the *only* file the challenge evaluator interacts with:
 
 .. code-block:: bash
 
-   uv run evaluate submissions/fast_mcmc/main.py -b ibm01
+   uv run evaluate submissions/modified_annealing/main.py -b ibm01
 
 The evaluator's contract is dead-simple – it loads this file, picks the
 first class that has a ``place(self, benchmark) -> torch.Tensor`` method,
@@ -34,9 +34,9 @@ Architecture (cursor.md §C + §G)
 2. **multiprocessing.Pool with N forked workers.**  Each worker receives
    a unique random seed so the parallel ensemble explores structurally
    different starting layouts (delegated to
-   :func:`fast_mcmc.initialization.grasp_initialize`) and follows
+   :func:`modified_annealing.initialization.grasp_initialize`) and follows
    independent Metropolis trajectories (delegated to
-   :func:`fast_mcmc.worker.run_worker`).  The fork context is used when
+   :func:`modified_annealing.worker.run_worker`).  The fork context is used when
    available (Linux / macOS), which gets us copy-on-write benchmark
    sharing and avoids re-pickling the netlist into every worker.
 
@@ -62,7 +62,7 @@ to stay ``__init__()``-with-no-arguments for the evaluator)::
     FAST_MCMC_WORKERS   pool size; 0 ⇒ cpu_count, 1 ⇒ serial      [0]
     FAST_MCMC_SEED      seed of the *first* worker; others get +i [0]
 
-Running ``python submissions/fast_mcmc/main.py`` directly bypasses the
+Running ``python submissions/modified_annealing/main.py`` directly bypasses the
 evaluator harness and exposes ``argparse`` flags ``-b/-w/-t/-s``.  This
 is the verification path that does *not* require ``macro_place`` /
 ``absl`` to be importable – it loads the cached ``.pt`` snapshot
@@ -115,7 +115,7 @@ if __name__ not in sys.modules:
     del _self_stub, _self_globals, _stub_getattr
 
 # Local package modules – kept as flat (non-relative) imports because
-# ``submissions/fast_mcmc/`` is not a Python package (no ``__init__.py``).
+# ``submissions/modified_annealing/`` is not a Python package (no ``__init__.py``).
 # The challenge harness's ``_load_placer`` (``macro_place/evaluate.py``)
 # loads us via ``importlib.util.spec_from_file_location`` + ``exec_module``,
 # which does NOT add the placer file's directory to ``sys.path``.  We
@@ -124,35 +124,6 @@ if __name__ not in sys.modules:
 _this_dir = os.path.dirname(os.path.abspath(__file__))
 if _this_dir not in sys.path:
     sys.path.insert(0, _this_dir)
-
-# #region agent log
-try:
-    import json as _dbg_json, os as _dbg_os, time as _dbg_time
-    _dbg_main_dir = _dbg_os.path.dirname(_dbg_os.path.abspath(__file__))
-    with open('/Users/lucasolmeta/Desktop/Projects/macro-place-challenge-2026/.cursor/debug-ad94f7.log', 'a') as _dbg_f:
-        _dbg_f.write(_dbg_json.dumps({
-            "sessionId": "ad94f7",
-            "hypothesisId": "H1+H2+H3",
-            "runId": "pre-fix",
-            "location": "submissions/fast_mcmc/main.py:120 (just before `import fast_eval`)",
-            "message": "sys.path / cwd / file-location snapshot at the failing import",
-            "data": {
-                "cwd": _dbg_os.getcwd(),
-                "__file__": __file__,
-                "__name__": __name__,
-                "main_dir": _dbg_main_dir,
-                "main_dir_on_sys_path": _dbg_main_dir in sys.path,
-                "fast_eval_exists_in_main_dir": _dbg_os.path.exists(_dbg_os.path.join(_dbg_main_dir, "fast_eval.py")),
-                "state_exists_in_main_dir": _dbg_os.path.exists(_dbg_os.path.join(_dbg_main_dir, "state.py")),
-                "sys_path": list(sys.path),
-                "PYTHONPATH_env": _dbg_os.environ.get("PYTHONPATH", "<unset>"),
-            },
-            "timestamp": int(_dbg_time.time() * 1000),
-        }) + "\n")
-    del _dbg_json, _dbg_os, _dbg_time, _dbg_main_dir, _dbg_f
-except Exception:
-    pass
-# #endregion
 
 import fast_eval as fe
 from initialization import GraspReport
@@ -186,7 +157,7 @@ def _env_float(name: str, default: float) -> float:
     try:
         return float(raw)
     except ValueError:
-        print(f"[fast_mcmc] WARNING: ${name}={raw!r} is not a number; using default {default}",
+        print(f"[modified_annealing] WARNING: ${name}={raw!r} is not a number; using default {default}",
               file=sys.stderr)
         return float(default)
 
@@ -198,7 +169,7 @@ def _env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError:
-        print(f"[fast_mcmc] WARNING: ${name}={raw!r} is not an integer; using default {default}",
+        print(f"[modified_annealing] WARNING: ${name}={raw!r} is not an integer; using default {default}",
               file=sys.stderr)
         return int(default)
 
@@ -231,7 +202,7 @@ def _resolve_num_workers(requested: int) -> int:
 
 class _NpTensor:
     """Duck-typed view that mirrors the subset of ``torch.Tensor`` that
-    :func:`fast_mcmc.state.build_state` actually calls.
+    :func:`modified_annealing.state.build_state` actually calls.
 
     Carrying numpy through the IPC channel avoids importing torch on the
     workers entirely; the same shim lets the benchmark consumer ignore
@@ -463,7 +434,7 @@ def _prewarm_numba(bundle: _BenchmarkBundle) -> None:
             )
     except Exception as exc:  # pragma: no cover – defensive
         # Pre-warm failures are non-fatal; workers will JIT lazily.
-        print(f"[fast_mcmc] Numba pre-warm skipped: {exc}", file=sys.stderr)
+        print(f"[modified_annealing] Numba pre-warm skipped: {exc}", file=sys.stderr)
 
 
 # ╔════════════════════════════════════════════════════════════════════════╗
@@ -573,7 +544,7 @@ def _run_pool(
                 pool.join()
                 if verbose:
                     print(
-                        f"[fast_mcmc] pool timed out after {wait_budget:.1f}s; "
+                        f"[modified_annealing] pool timed out after {wait_budget:.1f}s; "
                         "no usable results from this run",
                         file=sys.stderr,
                     )
@@ -618,7 +589,7 @@ def _run_pool(
 def _print_pool_summary(outcome: _PoolOutcome, *, benchmark_name: str = "?") -> None:
     """Pretty-print a one-line-per-worker summary of the pool run."""
     print()
-    print(f"=== fast_mcmc pool summary :: benchmark={benchmark_name} ===")
+    print(f"=== modified_annealing pool summary :: benchmark={benchmark_name} ===")
     print(f"  workers={outcome.num_workers}  start_method={outcome.pool_start_method}  "
           f"elapsed={outcome.elapsed_seconds:.2f}s")
     header = (
@@ -653,7 +624,7 @@ def _print_pool_summary(outcome: _PoolOutcome, *, benchmark_name: str = "?") -> 
 # ║ 4. Placer class (evaluator-facing entry point)                         ║
 # ╚════════════════════════════════════════════════════════════════════════╝
 
-class FastMCMCPlacer:
+class ModifiedAnnealingPlacer:
     """High-performance parallel MCMC macro placer.
 
     Constructed with **no arguments** so it slots into the challenge
@@ -753,7 +724,7 @@ class FastMCMCPlacer:
         if outcome.best_index >= 0:
             winner = outcome.results[outcome.best_index]
             print(
-                f"[fast_mcmc] WARNING: no worker produced a valid layout; "
+                f"[modified_annealing] WARNING: no worker produced a valid layout; "
                 f"returning best-effort layout from seed={winner.seed} "
                 f"(cost_proxy={winner.cost_proxy:.4f}, violations="
                 f"{winner.violations})",
@@ -762,7 +733,7 @@ class FastMCMCPlacer:
             return winner.state, False, winner.seed
 
         print(
-            "[fast_mcmc] WARNING: worker pool returned no results "
+            "[modified_annealing] WARNING: worker pool returned no results "
             "(likely timed out before any worker finished). "
             "Returning the benchmark's initial placement unchanged.",
             file=sys.stderr,
@@ -840,7 +811,7 @@ class FastMCMCPlacer:
 # ║ 5. Standalone CLI (cursor.md §G)                                       ║
 # ╚════════════════════════════════════════════════════════════════════════╝
 #
-# This block runs only when ``python submissions/fast_mcmc/main.py`` is
+# This block runs only when ``python submissions/modified_annealing/main.py`` is
 # invoked *directly* (not through the evaluator harness).  It exposes the
 # three required flags and emits an ``evaluate``-style summary line so
 # CI scripts can grep the result.
@@ -977,9 +948,9 @@ def _format_cli_summary(
 
 def _cli_main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="fast_mcmc",
+        prog="modified_annealing",
         description=(
-            "Standalone driver for the fast_mcmc parallel macro placer. "
+            "Standalone driver for the modified_annealing parallel macro placer. "
             "Loads a benchmark, fans MCMC workers out onto a multiprocessing "
             "pool, picks the lowest-cost valid layout, and prints an "
             "evaluate-style summary line."
@@ -1025,7 +996,7 @@ def _cli_main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         benchmark = _cli_load_benchmark(args.benchmark)
     except Exception as exc:
-        print(f"[fast_mcmc] failed to load benchmark {args.benchmark!r}: {exc}",
+        print(f"[modified_annealing] failed to load benchmark {args.benchmark!r}: {exc}",
               file=sys.stderr)
         return 2
 
@@ -1033,7 +1004,7 @@ def _cli_main(argv: Optional[Sequence[str]] = None) -> int:
     overrides = WorkerConfig(enable_grasp=not args.no_grasp)
 
     print("=" * 80)
-    print(f"fast_mcmc · benchmark={args.benchmark} workers={n_workers} "
+    print(f"modified_annealing · benchmark={args.benchmark} workers={n_workers} "
           f"timeout={args.timeout:.1f}s seed_base={args.seed}")
     print("=" * 80)
 
@@ -1050,10 +1021,10 @@ def _cli_main(argv: Optional[Sequence[str]] = None) -> int:
     runtime = time.perf_counter() - t0
 
     # Build the final placement tensor exactly the way the evaluator
-    # would consume it.  Going through ``FastMCMCPlacer`` is more
+    # would consume it.  Going through ``ModifiedAnnealingPlacer`` is more
     # honest than poking ``outcome.results`` directly because it
     # exercises the fixed-macro echo-back and dtype handling.
-    placer = FastMCMCPlacer.__new__(FastMCMCPlacer)
+    placer = ModifiedAnnealingPlacer.__new__(ModifiedAnnealingPlacer)
     placer.timeout_seconds = args.timeout
     placer.num_workers     = n_workers
     placer.seed_base       = args.seed

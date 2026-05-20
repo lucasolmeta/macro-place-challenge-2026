@@ -1,12 +1,12 @@
 """
-fast_mcmc.fast_eval
+modified_annealing.fast_eval
 ===================
 
 Procedural, Numba-JIT-compiled mathematics pipeline for the MCMC engine.
 
 This module is intentionally **stateless**.  Every function is a free,
 ``@njit(cache=True)``-decorated kernel that operates exclusively on the
-flat ``numpy`` arrays defined in :mod:`fast_mcmc.state`.  No instance of
+flat ``numpy`` arrays defined in :mod:`modified_annealing.state`.  No instance of
 ``PlacementState`` is ever passed in: that container is only meaningful
 at the orchestration layer (``worker.py`` / ``main.py``).  This design
 keeps the hot path free of Python attribute lookups and lets the kernels
@@ -112,7 +112,7 @@ except Exception:  # pragma: no cover – numba unavailable in some sandboxes
 
 EMPTY_CELL: int = -1
 """Sentinel value for ``spatial_grid`` cells with no occupying macro.
-Must agree with :data:`fast_mcmc.state.EMPTY_CELL`."""
+Must agree with :data:`modified_annealing.state.EMPTY_CELL`."""
 
 EPS: float = 1e-9
 """Numerical tolerance for bin-range edge rounding (mirrors ``state.EPS``)."""
@@ -131,7 +131,7 @@ def compute_macro_bin_range_njit(
 ) -> Tuple[int, int, int, int]:
     """Inclusive bin range covered by a macro's continuous bounding box.
 
-    Mirrors :func:`fast_mcmc.state.compute_macro_bin_range` but as an
+    Mirrors :func:`modified_annealing.state.compute_macro_bin_range` but as an
     ``@njit`` kernel so it can be called from the inner Metropolis loop
     without a Python round-trip.  Uses the half-open interval convention
     on the upper edge so macros touching exactly at a bin boundary do
@@ -318,7 +318,7 @@ def net_bbox_with_override_njit(
     either slot to disable the corresponding override.
 
     The net's centre coordinates are computed identically to
-    :func:`fast_mcmc.state.compute_net_bbox` so the cached
+    :func:`modified_annealing.state.compute_net_bbox` so the cached
     ``net_bbox`` and a fresh recomputation are bit-identical when no
     override is supplied.
     """
@@ -393,7 +393,7 @@ def populate_net_bbox_njit(
 ) -> None:
     """Fill ``net_bbox`` from scratch using current macro coordinates.
 
-    Equivalent to :func:`fast_mcmc.state.compute_net_bbox` but as an
+    Equivalent to :func:`modified_annealing.state.compute_net_bbox` but as an
     ``@njit`` kernel.  Useful when a worker process wants to
     re-synchronise the cache after a non-incremental update (e.g. after
     GRASP initialisation).

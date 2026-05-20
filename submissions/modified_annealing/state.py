@@ -1,5 +1,5 @@
 """
-fast_mcmc.state
+modified_annealing.state
 ===============
 
 Data-oriented memory architect for the high-performance MCMC macro placer.
@@ -898,7 +898,7 @@ def verify_state(state: PlacementState) -> List[str]:
 
 if __name__ == "__main__":
     # Self-contained smoke test that does not require torch or any
-    # external benchmark file.  Run with:  python -m fast_mcmc.state
+    # external benchmark file.  Run with:  python -m modified_annealing.state
     import types
 
     class _StubTensor:

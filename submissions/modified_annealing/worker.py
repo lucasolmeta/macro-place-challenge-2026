@@ -1,17 +1,17 @@
 """
-fast_mcmc.worker
+modified_annealing.worker
 ================
 
 Core Metropolis-Hastings simulated-annealing optimiser for the MCMC
 macro placer.
 
 This module is the entire "computational engine" called out in
-``cursor.md`` §D.  A worker process owns one cloned :class:`fast_mcmc.
+``cursor.md`` §D.  A worker process owns one cloned :class:`modified_annealing.
 state.PlacementState`, a private ``density_grid`` float matrix, a few
 fixed-size scratch buffers, and a seeded :class:`numpy.random.Generator`.
 It then executes a single, long-running optimisation loop:
 
-1. **GRASP construction** (delegated to :func:`fast_mcmc.initialization.
+1. **GRASP construction** (delegated to :func:`modified_annealing.initialization.
    grasp_initialize`) yields a structurally diverse starting layout and
    stamps every hard macro onto ``spatial_grid``.
 
@@ -44,7 +44,7 @@ It then executes a single, long-running optimisation loop:
        move that would *increase* the foreign-cell count in the moving
        macro's bbox, driving the layout to zero overlap.
 
-   * calls the Numba delta kernels in :mod:`fast_mcmc.fast_eval` to get
+   * calls the Numba delta kernels in :mod:`modified_annealing.fast_eval` to get
      exact ``(Δ_wl, Δ_density, Δ_congestion)`` and commits them
      atomically on acceptance.
 
@@ -57,7 +57,7 @@ It then executes a single, long-running optimisation loop:
    checks – vectorised canvas containment, ``count_grid_collisions_njit``
    over the rebuilt spatial grid, and an exact pairwise hard-macro bbox
    intersection – and the worker marks itself ``valid=False`` if *any*
-   of them flags a violation, forcing :mod:`fast_mcmc.main` to discard
+   of them flags a violation, forcing :mod:`modified_annealing.main` to discard
    the run.
 
 All randomness flows through ``numpy.random.default_rng(seed)`` so two
@@ -66,7 +66,7 @@ yield diverse exploration trajectories (this is the parallel pool's
 basic premise).
 
 The module is import-safe with or without Numba: the kernels in
-:mod:`fast_mcmc.fast_eval` already provide a graceful fallback.
+:mod:`modified_annealing.fast_eval` already provide a graceful fallback.
 """
 
 from __future__ import annotations
@@ -196,7 +196,7 @@ class WorkerResult:
 
     The final layout is carried by ``state.macro_coords`` /
     ``state.macro_dims`` (bottom-left convention; convert via
-    :func:`fast_mcmc.state.bottom_left_to_centers` before handing to the
+    :func:`modified_annealing.state.bottom_left_to_centers` before handing to the
     evaluator).  ``valid`` is ``True`` iff the final-validity sweep
     found zero canvas violations *and* zero hard-macro overlaps.
     """

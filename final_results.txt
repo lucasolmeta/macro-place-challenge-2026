@@ -1,6 +1,7 @@
-uv run evaluate submissions/fast_mcmc/main.py --all                         
+uv run evaluate submissions/modified_annealing/main.py --all
+
 ================================================================================
-evaluate · FastMCMCPlacer  (submissions/fast_mcmc/main.py)
+evaluate · ModifiedAnnealingPlacer  (submissions/modified_annealing/main.py)
 ================================================================================
 
   ibm01... #[INFO] Reading from external/MacroPlacement/Testcases/ICCAD04/ibm01/netlist.pb.txt
